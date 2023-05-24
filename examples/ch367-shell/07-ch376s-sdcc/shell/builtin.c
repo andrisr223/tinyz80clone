@@ -4,6 +4,8 @@
 #include <ctype.h>
 
 #include "utils/utils.h"
+#include "ch376s/commdef.h"
+
 #include "shell.h"
 
 #define USE_UBASIC
@@ -19,6 +21,25 @@ typedef struct chdir_context_s
     uint8_t position;
     uint8_t flags;
 } chdir_context_t;
+
+// TODO read/write contexts with path might be file handle
+// to implement regular open/close/read/write/seek api.
+typedef struct read_context_s
+{
+    uint32_t cursor_position;
+    uint16_t sector_counter;
+    uint8_t flags;
+} read_context_t;
+
+typedef struct write_context_s
+{
+    uint32_t data_length;
+    uint32_t data_position;
+    uint32_t cursor_position;
+    uint16_t sector_counter;
+    uint8_t *data;
+    uint8_t flags;
+} write_context_t;
 
 #ifdef USE_UBASIC
 typedef struct exec_buffer_s
@@ -42,6 +63,9 @@ static int8_t _shell_rm_status(ch376s_context_t *ctx);
 
 static int8_t _shell_cat_status(ch376s_context_t *ctx);
 
+static int8_t _shell_write_helper(ch376s_context_t *ctx, uint8_t cmd, uint8_t *data, uint8_t *data_length, uint8_t data_length_max);
+static int8_t _shell_write_status(ch376s_context_t *ctx);
+
 #ifdef USE_UBASIC
 static int8_t _shell_run_status(ch376s_context_t *ctx);
 #endif /* USE_UBASIC */
@@ -56,7 +80,7 @@ int8_t shell_usage(info_t *info)
         "\tpwd\t\tshow current working directory\r\n"
         "\thelp\t\tshow this help message\r\n"
         "\tmount\t\tmount the SD card\r\n"
-        "\tunmount\t\tunmount the SD card\r\n"
+        "\tumount\t\tunmount the SD card\r\n"
         "\treset\t\treset the CH376S chip\r\n"
         "\tstatus\t\tread interrupt status of the CH376S chip\r\n"
         "\tls\t\tlist directory\r\n"
@@ -70,6 +94,7 @@ int8_t shell_usage(info_t *info)
 #ifdef USE_UBASIC
         "\trun\t\texecute a BASIC script\r\n"
 #endif /* USE_UBASIC */
+        "\tdate\t\tprint current date\r\n"
         );
     return 0;
 }
@@ -91,6 +116,15 @@ int8_t shell_rand(info_t *info)
     printf("%02x\r\n", result);
     return 0;
 }
+
+int8_t shell_date(info_t *info)
+{
+    (void)info;
+
+    printf("%04d.%02d.%02d %02d:%02d:%02d\r\n", 2023, 5, 7, 12, 0, 0);
+    return 0;
+}
+
 int8_t shell_reset(info_t *info)
 {
     info->status = runCommandSequence(&context, reset);
@@ -208,6 +242,8 @@ int8_t shell_combined(info_t *info)
         chdir_ctx.id = CMD_CD;
 
         chdir_ctx.position = 0;
+        // printf("%s: pwd: %s\r\n", __func__, ENV_PWD);
+        // printf("%s: param: %s\r\n", __func__, info->argv[i]);
         chdir_ctx.path = shell_sanitize_path(ENV_PWD, info->argv[i]);
         // printf("%s: sanitized path: %s\r\n", __func__, chdir_ctx.path);
 
@@ -235,11 +271,22 @@ int8_t shell_combined(info_t *info)
         if (info->status != 0)
         {
             printf(FMT_NO_SUCH_FILE_DIR, info->argv[0], info->argv[i]);
-            continue;
+            goto close_;
+        }
+        else
+        {
+            if ((chdir_ctx.flags & OPT_u) == 0)
+            {
+                uint32_t len = strlen(chdir_ctx.path);
+                _memcpy(ENV_PWD, chdir_ctx.path, len);
+                ENV_PWD[len] = 0;
+            }
+
         }
 
+        // change directory command finished
         if (info->cmd_id == CMD_CD)
-            continue;
+            goto close_;
 
 command_:
         if (chdir_ctx.position >= strlen(chdir_ctx.path))
@@ -258,7 +305,6 @@ command_:
         switch (info->cmd_id)
         {
         case CMD_RM:
-            // context.on_sequence_status_callback = _shell_rm_status;
             command = delete;
             break;
         case CMD_TOUCH:
@@ -275,19 +321,30 @@ command_:
         case CMD_CAT:
             context.on_sequence_status_callback = _shell_cd_status;
             info->status = runCommandSequence(&context, open);
+            // TODO file should be closed regardless of the status later
             if (0 == info->status)
             {
+                read_context_t read_ctx;
+                read_ctx.cursor_position = 0;
+                read_ctx.sector_counter = 0;
+                read_ctx.flags = info->flags;
+
+                context.user_data = &read_ctx;
                 context.on_command_execute_callback = NULL;
                 context.on_sequence_status_callback = _shell_cat_status;
-                // command = read;
                 info->status = runCommandSequence(&context, read);
             }
+
+            // context.user_data = &chdir_ctx;
+            // context.on_command_execute_callback = NULL;
+            // context.on_sequence_status_callback = NULL;
             command = close;
             break;
         case CMD_RUN:
         {
             context.on_sequence_status_callback = _shell_cd_status;
             info->status = runCommandSequence(&context, open);
+            // TODO file should be closed regardless of the status change later
             if (0 == info->status)
             {
                 file_info_t *file_info = (file_info_t *)context.response_buffer;
@@ -324,6 +381,40 @@ command_:
                     free(exec_buf.buf);
                 }
             }
+
+            // context.user_data = &chdir_ctx;
+            // context.on_command_execute_callback = NULL;
+            // context.on_sequence_status_callback = NULL;
+            command = close;
+        }
+            break;
+        case CMD_APPEND:
+        {
+            // exhaust params to avoid outer loop over arguments
+            i = info->argc - 1;
+            context.on_sequence_status_callback = _shell_cd_status;
+            info->status = runCommandSequence(&context, open/*OrCreate*/);
+            // TODO file should be closed regardless of the status change later
+            if (0 == info->status)
+            {
+                write_context_t write_ctx;
+                write_ctx.cursor_position = 0;
+                write_ctx.sector_counter = 0;
+                write_ctx.flags = info->flags;
+
+                write_ctx.data = info->argv[i];
+                write_ctx.data_length = strlen(info->argv[i]);
+                write_ctx.data_position = 0;
+
+                context.user_data = &write_ctx;
+                context.on_command_execute_callback = _shell_write_helper;
+                context.on_sequence_status_callback = _shell_write_status;
+                info->status = runCommandSequence(&context, write);
+            }
+
+            // context.user_data = &chdir_ctx;
+            // context.on_command_execute_callback = NULL;
+            // context.on_sequence_status_callback = NULL;
             command = close;
         }
             break;
@@ -333,9 +424,13 @@ command_:
             break;
         }
 
-        if (0 == info->status)
-            info->status = runCommandSequence(&context, command);
+        if (command && close != command)
+        {
+            int8_t rc = runCommandSequence(&context, command);
+            info->status = 0 == info->status ? rc : info->status;
+        }
 
+close_:
         if (chdir_ctx.path)
             free(chdir_ctx.path);
 
@@ -384,6 +479,7 @@ default_:
             if (path == NULL)
                 return -1;
 
+            // copy part of the path to the command buffer
             uint8_t i = 0;
             while (i < CH376_FILE_NAME_LEN_MAX)
             {
@@ -475,30 +571,25 @@ static int8_t _shell_cd_status(ch376s_context_t *ctx)
                 _shell_file_info_print(file_info, chdir_ctx->flags);
                 break;
             case CMD_CD:
+                // handle CMD_DIR_INFO_READ result
+                if (!(file_info->fattr & CH376_ATTR_DIRECTORY))
+                {
+                    // TODO not a directory
+                    // TODO close file
+                    rc = -1;
+                }
+
                 // special case for / which does not get a proper file info
                 // (returned buffer is all zeros but has a length)
                 if ((chdir_ctx->flags & OPT_u) == 0)
                     if (chdir_ctx->path[0] == '/' && chdir_ctx->path[1] == 0)
                     {
                         // update PWD
-                        ENV_PWD[0] = '/';
-                        ENV_PWD[1] = 0;
-                        break;
+                        // ENV_PWD[0] = '/';
+                        // ENV_PWD[1] = 0;
+                        rc = 0;
                     }
 
-                // handle CMD_DIR_INFO_READ result
-                if ((file_info->fattr & CH376_ATTR_DIRECTORY))
-                {
-                    // update PWD
-                    if ((chdir_ctx->flags & OPT_u) == 0)
-                        _shell_update_pwd(file_info);
-                }
-                else
-                {
-                    // TODO not a directory
-                    // TODO close file
-                    rc = -1;
-                }
                 break;
             case CMD_CAT:
             case CMD_RUN:
@@ -534,14 +625,14 @@ static int8_t _shell_cat_status(ch376s_context_t *ctx)
     if (ctx == NULL)
         return 0;
 
-    chdir_context_t *chdir_ctx = ctx->user_data;
+    read_context_t *read_ctx = ctx->user_data;
 
-    if (chdir_ctx == NULL)
+    if (read_ctx == NULL)
         return -1;
 
     if (ctx->last_command == CMD_RD_USB_DATA0)
     {
-        if (chdir_ctx->flags & OPT_c)
+        if (read_ctx->flags & OPT_c)
         {
             // TODO save status between calls
             // (use a different struct than chdir_context_t)
@@ -583,7 +674,81 @@ static int8_t _shell_cat_status(ch376s_context_t *ctx)
                 last_char = ctx->response_buffer[i];
             }
         }
+
+        /*
+         * Sector check should not be a responsibility of a shell command.
+         * This could be solved by always requesting SECTOR_SIZE bytes for read
+         * if memory is not a constraint.
+         */
+        read_ctx->sector_counter += ctx->response_length;
+        if (read_ctx->sector_counter >= SECTOR_SIZE)
+        {
+            ctx->last_data = ANSW_ERR_NEXT_SECTOR;
+            read_ctx->sector_counter = 0;
+        }
     }
+
+    return 0;
+}
+
+static int8_t _shell_write_helper(ch376s_context_t *ctx, uint8_t cmd, uint8_t *data, uint8_t *data_length, uint8_t data_length_max)
+{
+    if (ctx == NULL)
+        return -1;
+
+    write_context_t *info = ctx->user_data;
+
+    if (info == NULL)
+        return -1;
+
+    if (cmd == CMD_BYTE_LOCATE)
+    {
+        // in case of append, seek to the end of the file
+        // if info->id == CMD_APPEND
+        data[0] = 0xff;
+        data[1] = 0xff;
+        data[2] = 0xff;
+        data[3] = 0xff;
+        *data_length = 4;
+    }
+    else if (cmd == CMD_BYTE_WRITE)
+    {
+        uint32_t remaining_length = info->data_length - info->data_position;
+        // write 64 bytes at a time (255 may be allowed maximum)
+        data[0] = remaining_length > 64 ? 64 : (uint8_t) remaining_length;
+        data[1] = 0;
+        *data_length = 2;
+    }
+    // else if (cmd == CMD_WR_REQ_DATA)
+    // {
+    // }
+    else if (cmd == __CMD_RAW_WRITE)
+    {
+        // ctx->last_data here holds the answer to CMD_WR_REQ_DATA
+        // which is the length we are allowed to write at this point
+        _memcpy(data, info->data + info->data_position, ctx->last_data);
+        *data_length = ctx->last_data;
+        info->data_position += ctx->last_data;
+    }
+
+    return 0;
+}
+
+static int8_t _shell_write_status(ch376s_context_t *ctx)
+{
+    if (ctx == NULL)
+        return -1;
+
+    write_context_t *info = ctx->user_data;
+
+    if (info == NULL)
+        return -1;
+
+    // if (ctx->last_command == CMD_WR_REQ_DATA)
+    // {
+    //     if (ctx->last_data == 0 && info->data_length > 0)
+    //         return -1;
+    // }
 
     return 0;
 }

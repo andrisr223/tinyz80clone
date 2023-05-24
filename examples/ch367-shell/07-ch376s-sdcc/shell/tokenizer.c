@@ -8,12 +8,17 @@
  * @delim: the delimeter string
  * Return: 1 if true, 0 if false
  */
-int is_delim(char c, char *delim)
+uint8_t is_delim(char c, char *delim)
 {
-	while (*delim)
-		if (*delim++ == c)
-			return (1);
-	return (0);
+    while (*delim)
+        if (*delim++ == c)
+            return (1);
+    return (0);
+}
+
+uint8_t is_quote(char c, char p, uint8_t pos)
+{
+    return c == '"' && (pos == 0 || (pos > 0 && p != '\\'));
 }
 
 /**
@@ -22,45 +27,80 @@ int is_delim(char c, char *delim)
  * @d: the delimeter string
  * Return: a pointer to an array of strings, or NULL on failure
  */
-
 char **strtow(char *str, char *d)
 {
-	int i, j, k, m, numwords = 0;
-	char **s;
+    int i, j, k, m, numwords = 0;
+    char **s;
 
-	if (str == NULL || str[0] == 0)
-		return (NULL);
-	if (!d)
-		d = " ";
-	for (i = 0; str[i] != '\0'; i++)
-		if (!is_delim(str[i], d) && (is_delim(str[i + 1], d) || !str[i + 1]))
-			numwords++;
+    if (str == NULL || str[0] == 0)
+        return (NULL);
+    if (!d)
+        d = " ";
+    for (i = 0; str[i] != '\0'; i++)
+    {
+        if (is_quote(str[i], i > 0 ? str[i - 1] : 0, i))
+        {
+            i++;
+            while (str[i] && !is_quote(str[i], i > 0 ? str[i - 1] : 0, i)) i++;
+            // if (str[i] == 0) error;
+        }
+        if (!is_delim(str[i], d) && (is_delim(str[i + 1], d) || !str[i + 1]))
+            numwords++;
+    }
 
-	if (numwords == 0)
-		return (NULL);
-	s = malloc((1 + numwords) * sizeof(char *));
-	if (!s)
-		return (NULL);
-	for (i = 0, j = 0; j < numwords; j++)
-	{
-		while (is_delim(str[i], d))
-			i++;
-		k = 0;
-		while (!is_delim(str[i + k], d) && str[i + k])
-			k++;
-		s[j] = malloc((k + 1) * sizeof(char));
-		if (!s[j])
-		{
-			// TODO ffree
-			for (k = 0; k < j; k++)
-				free(s[k]);
-			free(s);
-			return (NULL);
-		}
-		for (m = 0; m < k; m++)
-			s[j][m] = str[i++];
-		s[j][m] = 0;
-	}
-	s[j] = NULL;
-	return (s);
+    if (numwords == 0)
+        return (NULL);
+    s = malloc((1 + numwords) * sizeof(char *));
+    if (!s)
+        return (NULL);
+    uint8_t is_quoted = 0;
+    for (i = 0, j = 0; j < numwords; j++)
+    {
+        while (is_delim(str[i], d))
+            i++;
+
+        if (!is_quoted && is_quote(str[i], i > 0 ? str[i - 1] : 0, i))
+        {
+            is_quoted = 1;
+            i++;
+        }
+
+        k = 0;
+        // TODO
+        if (is_quoted)
+        {
+            while ((is_quoted && !is_quote(str[i + k], (i + k) > 0 ? str[i + k - 1] : 0, i + k))
+                        && str[i + k])
+                k++;
+        }
+        else
+        {
+            while (!is_delim(str[i + k], d) && str[i + k])
+                k++;
+        }
+
+        s[j] = malloc((k + 1) * sizeof(char));
+        if (!s[j])
+        {
+            // not enough memory for all words, clean up and exit here
+            // TODO ffree
+            for (k = 0; k < j; k++)
+                free(s[k]);
+            free(s);
+            return (NULL);
+        }
+
+        for (m = 0; m < k; m++)
+            s[j][m] = str[i++];
+        s[j][m] = 0;
+        s[j] = replace_escapes(s[j]);
+
+        if (is_quoted && is_quote(str[i], i > 0 ? str[i - 1] : 0, i))
+        {
+            is_quoted = 0;
+            i++;
+        }
+    }
+    s[j] = NULL;
+    return (s);
 }

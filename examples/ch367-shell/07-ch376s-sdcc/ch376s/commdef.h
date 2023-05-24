@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#define SECTORSIZE 512
+#define SECTOR_SIZE 512U
 
 #define CMD_PREFIX 0xAB57
 
@@ -120,6 +120,7 @@
  * Input: data to fill the requested length
  */
 #define CMD_WR_REQ_DATA 0x2d
+#define __CMD_RAW_WRITE 0xed
 
 /*
  * Write data to buffer with offset
@@ -344,6 +345,9 @@
 /* Attempted operation on a closed file */
 #define ANSW_ERR_FILE_CLOSE 0xb4
 
+/* */
+#define ANSW_ERR_NEXT_SECTOR 0xb5
+
 // const uint8_t CH376_ERR_OVERFLOW = 0x03;
 // const uint8_t CH376_ERR_TIMEOUT = 0x02;
 // const uint8_t CH376_ERR_NO_RESPONSE = 0x01;
@@ -380,7 +384,6 @@ union file_size_t
     uint32_t size;
 };
 
-
 /*
  * https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system
  */
@@ -400,7 +403,6 @@ typedef struct file_info_s
     uint32_t size;
 } file_info_t;
 
-
 typedef struct disk_info_s
 {
     uint32_t totalSector;   // the number of total sectors (low byte first)
@@ -410,7 +412,7 @@ typedef struct disk_info_s
 
 struct ch376s_context_s;
 
-typedef int8_t (*ch376s_cmd_callback_t)(struct ch376s_context_s *context/*, uint8_t data*/);
+typedef int8_t (*ch376s_cmd_callback_t)(struct ch376s_context_s *context);
 typedef int8_t (*ch376s_cmd_execute_callback_t)(struct ch376s_context_s *context, uint8_t cmd, uint8_t *data, uint8_t *data_length, uint8_t data_length_max);
 /* TODO volatile fields or the whole struct */
 typedef struct ch376s_context_s
@@ -441,18 +443,18 @@ typedef struct ch376s_context_s
     ch376s_cmd_callback_t on_sequence_completed_callback;
 
     ch376s_cmd_execute_callback_t on_command_execute_callback;
-    void *user_data;
 
+    void *user_data;
 } ch376s_context_t;
 
-typedef int8_t (*ch376s_command_t)(ch376s_context_t */*, void user_data*/);
+typedef int8_t (*ch376s_command_t)(ch376s_context_t *);
 
+/* deprecated */
 int8_t fetchVersion(ch376s_context_t *context);
 int8_t fetchStatus(ch376s_context_t *context);
 int8_t fetchDiskInfo(ch376s_context_t *context);
 int8_t fetchInterruptData(ch376s_context_t *context);
 int8_t setSDCardMode(ch376s_context_t *context);
-
 
 void resetContext(ch376s_context_t *context,
     ch376s_cmd_callback_t command_callback,
@@ -467,7 +469,7 @@ int8_t startCommandSequence(ch376s_context_t *context,
     uint8_t *sequence, uint8_t sequence_length);
 int8_t processCommandSequence(ch376s_context_t *context);
 
-int8_t isMounted(ch376s_context_t *context);
+// int8_t isMounted(ch376s_context_t *context);
 int8_t mount(ch376s_context_t *context);
 int8_t diskInfo(ch376s_context_t *context);
 int8_t unmount(ch376s_context_t *context);
@@ -477,8 +479,10 @@ int8_t makeDir(ch376s_context_t *context);
 int8_t changeDir(ch376s_context_t *context);
 
 int8_t open(ch376s_context_t *context);
-int8_t openWithDirInfo(ch376s_context_t *context);
+int8_t openOrCreate(ch376s_context_t *context);
+// int8_t openWithDirInfo(ch376s_context_t *context);
 int8_t read(ch376s_context_t *context);
+int8_t write(ch376s_context_t *context);
 int8_t close(ch376s_context_t *context);
 int8_t touch(ch376s_context_t *context);
 int8_t delete(ch376s_context_t *context);

@@ -11,9 +11,9 @@
  */
 int8_t replace_vars(info_t *info)
 {
-    int8_t i = 0;
+    uint8_t i = 0;
 
-    for (i = 0; info->argv[i]; i++)
+    for (i = 0; info->argv[i]; ++i)
     {
         if (info->argv[i][0] != '$' || !info->argv[i][1])
             continue;
@@ -87,4 +87,36 @@ char *convert_number(long int num, int base, int flags)
 	if (sign)
 		*--ptr = sign;
 	return (ptr);
+}
+
+char *replace_escapes(char *str)
+{
+    if (NULL == str)
+        return NULL;
+
+    uint8_t i = 0, j = 0;
+    while (str[i] != 0)
+    {
+        char c = str[i++];
+        if (c == '\\')
+        {
+            c = str[i++];
+            switch (c)
+            {
+                case 'n':
+                    c = '\n';
+                    break;
+                case 't':
+                    c = '\t';
+                    break;
+                case 'r':
+                    c = '\r';
+                    break;
+                default:;
+            }
+        }
+        str[j++] = c;
+    }
+    str[j] = 0;
+    return str;
 }

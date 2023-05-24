@@ -24,23 +24,17 @@ const uint8_t reset_sequence[] = {
 const uint8_t status_sequence[] = {
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
 
-const uint8_t check_mount_sequence[] = {
-    SEQ_ITEM_TAG, 1, CMD_DISK_CONNECT,
-    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    SEQ_ECBK_TAG, 0};
+// const uint8_t check_mount_sequence[] = {
+//     SEQ_ITEM_TAG, 1, CMD_DISK_CONNECT,              // not supported for SD card
+//     SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
 
 const uint8_t mount_sequence[] = {
     SEQ_ITEM_TAG, 2, CMD_SET_USB_MODE, MODE_HOST_0,
     SEQ_SLEEP_TAG,0,
     SEQ_NEEXT_TAG,1, ANSW_RET_SUCCESS,              // exit, if mode failed
-    // SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    // SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if status failed
     SEQ_ITEM_TAG, 2, CMD_SET_USB_MODE, MODE_HOST_SD,
     SEQ_SLEEP_TAG,0,
     SEQ_NEEXT_TAG,1, ANSW_RET_SUCCESS,              // exit, if SD card not available
-    // SEQ_NCDJ_TAG, 2, ANSW_RET_SUCCESS, 0xff,        // exit, if SD card not available
-    // SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    // SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if status failed
     SEQ_ITEM_TAG, 1, CMD_DISK_MOUNT,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if status failed
@@ -51,48 +45,64 @@ const uint8_t mount_sequence[] = {
 
 const uint8_t unmount_sequence[] = {
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    // SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
-    // SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     SEQ_ITEM_TAG, 2, CMD_SET_USB_MODE, MODE_HOST_0,
     SEQ_SLEEP_TAG,0,
-    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    SEQ_SCBK_TAG, 0};
+    SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if mode failed
+    // SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    // SEQ_SCBK_TAG, 0
+    };
 
 const uint8_t disk_info_sequence[] = {
     SEQ_ITEM_TAG, 1, CMD_DISK_QUERY,
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
     SEQ_SCBK_TAG, 0,                                // handle response (print disk info)
-    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    SEQ_ECBK_TAG, 0};
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
 
-
-/*
- * TODO use separate CMD_RD_USB_DATA0 for file case and close the file afterwards
- */
 uint8_t list_dir_sequence[] = {
-    // SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, '*', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     SEQ_ITEM_TAG, 1 + 2, CMD_SET_FILE_NAME, '*', 0,
     SEQ_ITEM_TAG, 1, CMD_FILE_OPEN,
     SEQ_CNDJ_TAG, 2, ANSW_ERR_OPEN_DIR, 0,          // jump to the beginning, retry with * as name
-    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 20,    // jump to CMD_RD_USB_DATA0
-    // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
+    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 35,    // jump to CMD_RD_USB_DATA0
+    // a regular file opened, read dir info
     SEQ_ITEM_TAG, 2, CMD_DIR_INFO_READ, 0xff,       // directory info for currently opened file, enum will not work
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
     SEQ_SCBK_TAG, 0,                                // handle response (print file name)
+    SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,             // close the file
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,                // clear interrupt
+    SEQ_JUMP_TAG, 1, 0xff,                          // exit the sequence
+    SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
+    SEQ_SCBK_TAG, 0,                                // handle response (print file name)
     SEQ_ITEM_TAG, 1, CMD_FILE_ENUM_GO,
-    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 20,    // return to CMD_RD_USB_DATA0
-    // SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,
+    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 35,    // return to CMD_RD_USB_DATA0
+    SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
 
+// uint8_t list_dir_sequence_bak[] = {
+//     // SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, '*', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//     SEQ_ITEM_TAG, 1 + 2, CMD_SET_FILE_NAME, '*', 0,
+//     SEQ_ITEM_TAG, 1, CMD_FILE_OPEN,
+//     SEQ_CNDJ_TAG, 2, ANSW_ERR_OPEN_DIR, 0,          // jump to the beginning, retry with * as name
+//     SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 20,    // jump to CMD_RD_USB_DATA0
+//     // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
+//     SEQ_ITEM_TAG, 2, CMD_DIR_INFO_READ, 0xff,       // directory info for currently opened file, enum will not work
+//     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
+//     SEQ_SCBK_TAG, 0,                                // handle response (print file name)
+//     SEQ_ITEM_TAG, 1, CMD_FILE_ENUM_GO,
+//     SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 20,    // return to CMD_RD_USB_DATA0
+//     // SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,
+//     SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
+
 uint8_t create_file_sequence[] = {
-    SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    SEQ_ITEM_TAG, 1 + 1, CMD_SET_FILE_NAME, 0,
     SEQ_ITEM_TAG, 1, CMD_FILE_CREATE,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     SEQ_SCBK_TAG, 0,                                // check result TODO
     SEQ_ITEM_TAG, 2, CMD_DIR_INFO_READ, 0xff,       // directory info for currently opened file
     // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
-    SEQ_ITEM_TAG, 1 + 2 + 32, CMD_WR_OFS_DATA, 0, sizeof(file_info_t), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // SEQ_ITEM_TAG, 1 + 2 + 32, CMD_WR_OFS_DATA, 0, sizeof(file_info_t), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    SEQ_ITEM_TAG, 1 + 2, CMD_WR_OFS_DATA, 0, sizeof(file_info_t),
     SEQ_ITEM_TAG, 1, CMD_DIR_INFO_SAVE,             // update file info
     SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 1,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS};
@@ -102,13 +112,15 @@ uint8_t delete_file_sequence[] = {
     SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     // set the name of the file to delete
-    SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    SEQ_ITEM_TAG, 1 + 1, CMD_SET_FILE_NAME, 0,
     SEQ_ITEM_TAG, 1, CMD_FILE_ERASE,                // returns ANSW_USB_INT_SUCCESS on success
     // SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     SEQ_SCBK_TAG, 0};
 
 uint8_t open_file_sequence[] = {
-    SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    // SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    SEQ_ITEM_TAG, 1 + 1, CMD_SET_FILE_NAME, 0,
     SEQ_ITEM_TAG, 1, CMD_FILE_OPEN,
     SEQ_SCBK_TAG, 0,
     SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if not file open
@@ -119,18 +131,35 @@ uint8_t open_file_sequence[] = {
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
     SEQ_SCBK_TAG, 0};
 
-uint8_t open_dirinfo_file_sequence[] = {
-    SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+uint8_t open_or_create_file_sequence[] = {
+    SEQ_ITEM_TAG, 1 + 1, CMD_SET_FILE_NAME, 0,
     SEQ_ITEM_TAG, 1, CMD_FILE_OPEN,
-    SEQ_CNDJ_TAG, 2, ANSW_ERR_MISS_FILE, 0xff,      // jump to the end
-    // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
-    // SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
-    // SEQ_SCBK_TAG, 0,
+    SEQ_SCBK_TAG, 0,                                // check result TODO
+    // on success go to dir info read
+    // SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if not file open
+    // SEQ_CNDJ_TAG, 2, ANSW_ERR_MISS_FILE, 0xff,      // jump to the end
+    SEQ_ITEM_TAG, 1, CMD_FILE_CREATE,
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    SEQ_SCBK_TAG, 0,                                // check result TODO
+    SEQ_NEEXT_TAG,1, ANSW_USB_INT_SUCCESS,          // exit, if not file open
     SEQ_ITEM_TAG, 2, CMD_DIR_INFO_READ, 0xff,       // directory info for currently opened file
     SEQ_SCBK_TAG, 0,
     // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
     SEQ_SCBK_TAG, 0};
+
+// uint8_t open_dirinfo_file_sequence[] = {
+//     SEQ_ITEM_TAG, 1 + 8 + 3 + 1 + 2, CMD_SET_FILE_NAME, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//     SEQ_ITEM_TAG, 1, CMD_FILE_OPEN,
+//     SEQ_CNDJ_TAG, 2, ANSW_ERR_MISS_FILE, 0xff,      // jump to the end
+//     // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
+//     // SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
+//     // SEQ_SCBK_TAG, 0,
+//     SEQ_ITEM_TAG, 2, CMD_DIR_INFO_READ, 0xff,       // directory info for currently opened file
+//     SEQ_SCBK_TAG, 0,
+//     // should skip CMD_RD_USB_DATA0 if response != ANSW_USB_INT_DISK_READ
+//     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,
+//     SEQ_SCBK_TAG, 0};
 
 uint8_t read_file_sequence[] = {
     SEQ_ITEM_TAG, 3, CMD_BYTE_READ, 0x40, 0x00,     // request to read 64 bytes
@@ -138,14 +167,44 @@ uint8_t read_file_sequence[] = {
     SEQ_CNDJ_TAG, 2, ANSW_ERR_FILE_CLOSE, 0xff,     // attempted op on a closed file
     // if response == ANSW_USB_INT_DISK_READ proceed to read
     SEQ_NCDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 0xff,  // jump to end, if !ANSW_USB_INT_DISK_READ
+    // if response == ANSW_USB_INT_SUCCESS, jump to the end, or maybe request next chunk
     SEQ_ITEM_TAG, 1, CMD_RD_USB_DATA0,              // actually read the data
     SEQ_SCBK_TAG, 0,                                // handle the result
+    // if SECTOR_SIZE bytes have been read go to CMD_BYTE_RD_GO
+    // ANSW_ERR_NEXT_SECTOR is set by callback in SEQ_SCBK_TAG
+    // this might not be necessary if reading was done by SECTOR_SIZE chunks
+    SEQ_CNDJ_TAG, 2, ANSW_ERR_NEXT_SECTOR, 0x21,    // CMD_BYTE_RD_GO @33
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
-    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 0      // jump to CMD_BYTE_READ, continue reading
+    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_READ, 0,     // jump to CMD_BYTE_READ, continue reading
+    SEQ_ITEM_TAG, 1, CMD_BYTE_RD_GO,                // request next sector
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    SEQ_JUMP_TAG, 1, 0
+    };
+
+uint8_t write_file_sequence[] = {
+    SEQ_ITEM_TAG, 5, CMD_BYTE_LOCATE, 0xff, 0xff, 0xff, 0xff, // move to the end
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    SEQ_ITEM_TAG, 3, CMD_BYTE_WRITE, 0x0a, 0x00,    // request to write 64 bytes
+    // SEQ_CNDJ_TAG, 2, ANSW_USB_INT_SUCCESS, 0xXX,    // goto write
+    // SEQ_CNDJ_TAG, 2, ANSW_USB_INT_DISK_WRITE, 0xXX, // goto write data from buffer
+
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_SUCCESS, 0x22,    // jump to CMD_BYTE_WR_GO
+    SEQ_NCDJ_TAG, 2, ANSW_USB_INT_DISK_WRITE, 0xff, // jump to end, if !USB_INT_DISK_WRITE
+    // write data from buffer
+    SEQ_ITEM_TAG, 1, CMD_WR_REQ_DATA,               // answer is the number of bytes to write
+    SEQ_ITEM_TAG, 2, __CMD_RAW_WRITE, 0x00,         // so fill the buffer and do the write
+    SEQ_SCBK_TAG, 0,                                // handle the result
+    SEQ_ITEM_TAG, 1, CMD_BYTE_WR_GO,
+    SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
+    SEQ_SCBK_TAG, 0,                                // handle the result
+                                                    // handler can return -126
+                                                    // when there is nothing left to write
+    SEQ_CNDJ_TAG, 2, ANSW_USB_INT_SUCCESS, 0x09,    // jump to CMD_BYTE_WRITE
     };
 
 const uint8_t close_file_sequence[] = {
-    SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 0,
+    SEQ_ITEM_TAG, 2, CMD_FILE_CLOSE, 1,
     SEQ_ITEM_TAG, 1, CMD_GET_STATUS,
     // for some reason it is necessary to open / after CMD_FILE_CLOSE
     // otherwise CMD_RD_USB_DATA0 will continue to read from
@@ -238,7 +297,7 @@ const char * const answerMapLookup(uint8_t code)
 }
 // #endif /* DEBUG */
 
-static int8_t write(uint8_t const* buf, uint8_t length) __naked
+static int8_t _write(uint8_t const* buf, uint8_t length) __naked
 {
     // (void)buf;
     // (void)length;
@@ -277,6 +336,9 @@ static int8_t sendCommand(ch376s_context_t *context, uint8_t cmd, const uint8_t 
         || cmd == CMD_FILE_CLOSE
         || cmd == CMD_RESET_ALL
         || cmd == CMD_WR_OFS_DATA
+        || cmd == CMD_BYTE_RD_GO
+        || cmd == __CMD_RAW_WRITE
+        || cmd == CMD_BYTE_LOCATE
         /*|| cmd == CMD_FILE_ERASE*/)
     {
         context->command_active = 0;
@@ -299,9 +361,16 @@ static int8_t sendCommand(ch376s_context_t *context, uint8_t cmd, const uint8_t 
     }
 
     command_buffer[2] = cmd;
-    int8_t rc = write(command_buffer, 3);
+    int8_t rc = 0;
+    if (cmd != __CMD_RAW_WRITE)
+        rc = _write(command_buffer, 3);
+    
     if (0 == rc && data && length > 0)
-        rc = write(data, length);
+    {
+        // if (cmd == __CMD_RAW_WRITE)
+        //     printf("_write: length: %d, %s\r\n", length, data);
+        rc = _write(data, length);
+    }
 
     return rc;
 }
@@ -318,9 +387,11 @@ int8_t processCommandSequence(ch376s_context_t *context)
         debug_print("%s: finished\r\n", __func__);
         return -126;
     }
+    uint8_t *position = &context->command_sequence_position;
+    uint8_t *item = context->command_sequence + context->command_sequence_position;
 
-    uint8_t tag = *(context->command_sequence + context->command_sequence_position);
-    uint8_t len = *(context->command_sequence + context->command_sequence_position + 1);
+    uint8_t tag = *(item);
+    uint8_t len = *(item + 1);
     if ((context->command_sequence_position + len + 2) > context->command_sequence_length /* || len < 0 */)
     {
         debug_print("%s: invalid length: %d for tag %x @ position %d\r\n",
@@ -343,15 +414,15 @@ int8_t processCommandSequence(ch376s_context_t *context)
     switch (tag)
     {
         case SEQ_ITEM_TAG:
-            cmd = *(context->command_sequence + context->command_sequence_position + 2);
+            cmd = *(item + 2);
 
             if (len > 1)
             {
-                data = context->command_sequence + context->command_sequence_position + 3;
+                data = item + 3;
                 data_len = len - 1;
             }
 
-            context->command_sequence_position = context->command_sequence_position + 2 + len;
+            *position = *position + 2 + len;
 
             if (context->on_command_execute_callback)
             {
@@ -367,37 +438,37 @@ int8_t processCommandSequence(ch376s_context_t *context)
             break;
         case SEQ_JUMP_TAG:
             // destination position in the sequence is in the one data byte
-            data = context->command_sequence + context->command_sequence_position + 2;
-            context->command_sequence_position = *data;
+            data = item + 2;
+            *position = *data;
             // special case to exit
-            if (0xff == context->command_sequence_position)
-                context->command_sequence_position = context->command_sequence_length;
+            if (0xff == *position)
+                *position = context->command_sequence_length;
             break;
         case SEQ_CNDJ_TAG:
         case SEQ_NCDJ_TAG:
             // if last_data matches condition byte,
             // destination position in the sequence is in the one data byte
-            code = context->command_sequence + context->command_sequence_position + 2;
-            data = context->command_sequence + context->command_sequence_position + 3;
+            code = item + 2;
+            data = code + 1; // = context->command_sequence + context->command_sequence_position + 3;
             // debug_print("processCommandSequence: conditional jump: code %x, data, %x\r\n",
             //     *code, *data);
             if ((tag == SEQ_CNDJ_TAG && (*code == context->last_data))
                 || (tag == SEQ_NCDJ_TAG && (*code != context->last_data)))
             {
-                context->command_sequence_position = *data;
+                *position = *data;
                 // special case to exit
                 if (0xff == *data)
-                    context->command_sequence_position = context->command_sequence_length;
+                    *position = context->command_sequence_length;
             }
             else
-                context->command_sequence_position = context->command_sequence_position + 2 + 1 + 1;
+                *position = *position + 2 + 1 + 1;
             break;
         case SEQ_EEXT_TAG:
         case SEQ_NEEXT_TAG:
             // if last_data matches condition byte,
             // destination position is sequence end
             // result code is -1
-            code = context->command_sequence + context->command_sequence_position + 2;
+            code = item + 2;
             if ((tag == SEQ_EEXT_TAG && (*code == context->last_data))
                 || (tag == SEQ_NEEXT_TAG && (*code != context->last_data)))
             {
@@ -405,26 +476,26 @@ int8_t processCommandSequence(ch376s_context_t *context)
                     __func__, context->last_data, *code, context->last_command,
                     context->command_sequence_position);
 
-                context->command_sequence_position = context->command_sequence_length;
+                *position = context->command_sequence_length;
                 result = -1;
             }
             else
-                context->command_sequence_position = context->command_sequence_position + 2 + len;
+                *position = 2 + *position + len;
             break;
         case SEQ_SCBK_TAG:
-            context->command_sequence_position = context->command_sequence_position + 2 + len;
+            *position = *position + 2 + len;
             if (context->on_sequence_status_callback)
                 result = context->on_sequence_status_callback(context);
             break;
         case SEQ_ECBK_TAG:
-            context->command_sequence_position = context->command_sequence_position + 2 + len;
+            *position = 2 + len + *position;
             if (context->on_sequence_error_callback)
                 result = context->on_sequence_error_callback(context);
             break;
         // case SEQ_EXIT_TAG:
         //     break;
         case SEQ_SLEEP_TAG:
-            context->command_sequence_position = context->command_sequence_position + 2 + len;
+            *position = 2 + len + *position;
             __asm
                 ld      d,0xff
                 call    sleep
@@ -576,10 +647,10 @@ int8_t setSDCardMode(ch376s_context_t *context)
         sequence, \
         sizeof(sequence)/sizeof(sequence[0]));
 
-int8_t isMounted(ch376s_context_t *context)
-{
-    START_COMMAND(check_mount_sequence)
-}
+// int8_t isMounted(ch376s_context_t *context)
+// {
+//     START_COMMAND(check_mount_sequence)
+// }
 
 int8_t mount(ch376s_context_t *context)
 {
@@ -616,14 +687,25 @@ int8_t open(ch376s_context_t *context)
     START_COMMAND(open_file_sequence)
 }
 
-int8_t openWithDirInfo(ch376s_context_t *context)
+int8_t openOrCreate(ch376s_context_t *context)
 {
-    START_COMMAND(open_dirinfo_file_sequence)
+    // START_COMMAND(open_or_create_file_sequence)
+    START_COMMAND(open_file_sequence)
 }
+
+// int8_t openWithDirInfo(ch376s_context_t *context)
+// {
+//     START_COMMAND(open_dirinfo_file_sequence)
+// }
 
 int8_t read(ch376s_context_t *context)
 {
     START_COMMAND(read_file_sequence)
+}
+
+int8_t write(ch376s_context_t *context)
+{
+    START_COMMAND(write_file_sequence)
 }
 
 int8_t close(ch376s_context_t *context)

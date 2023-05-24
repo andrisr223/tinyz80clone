@@ -122,6 +122,11 @@ void _shell_file_info_print(const file_info_t *file_info, uint8_t flags)
     // skip hidden files if not requested with OPT_a
     if ((file_info->fattr & CH376_ATTR_HIDDEN) && !(flags & OPT_a))
         goto exit_;
+    // do not show . and .. TODO this makes .<name> hidden without an attribute
+    if (file_info->name[0] == '.'
+            // && (file_info->fattr & CH376_ATTR_DIRECTORY)
+            && !(flags & OPT_a))
+        goto exit_;
 
     // long listing
     if (flags & OPT_l)
@@ -148,7 +153,15 @@ void _shell_file_info_print(const file_info_t *file_info, uint8_t flags)
             month,
             day);
     }
-    printf("%.11s\r\n", file_info->name);
+    // light blue colour for directories
+    if (file_info->fattr & CH376_ATTR_DIRECTORY)
+        printf("\033[1;34m");
+    // green for txt, bas files
+    else if (strncmp("TXT", &file_info->name[8], 3) == 0
+        || strncmp("BAS", &file_info->name[8], 3) == 0)
+        printf("\033[0;32m");
+    // \033[0m clears any formatting
+    printf("%.11s\033[0m\r\n", file_info->name);
 exit_:
     return;
 }
