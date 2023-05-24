@@ -19,13 +19,13 @@ int8_t ENV_RC = 0;
 #define ESCS 0x1b
 
 #define X(a, b, c, d, e, f) [a] = {d, e, f},
-    const builtin_params_s builtin_params[] =
+    const builtin_params_t builtin_params[] =
     {
         BUILTIN_TABLE
     };
 #undef X
 
-static char * shell_read_command_line(char * buf, uint32_t buf_size);
+static char * shell_read_command_line(char * buf, uint8_t buf_size);
 static int8_t shell_find_builtin(info_t *info);
 static int8_t shell_handler(info_t *info, const char *command);
 
@@ -47,7 +47,7 @@ void shell_loop(info_t *info)
         // if interactive
         printf("> ");
         char *command = shell_read_command_line(command_line_buf,
-            sizeof(command_line_buf));
+            /*sizeof(command_line_buf)*/ 0xff);
         // if interactive
         printf("\r\n");
         if (command[0] == 0)
@@ -61,9 +61,9 @@ void shell_loop(info_t *info)
     }
 }
 
-static char * shell_read_command_line(char * buf, uint32_t buf_size)
+static char * shell_read_command_line(char * buf, uint8_t buf_size)
 {
-    uint32_t position = 0;
+    uint8_t position = 0;
     char c;
     int8_t is_escape = 0;
     int8_t is_csi = 0;
@@ -79,23 +79,23 @@ static char * shell_read_command_line(char * buf, uint32_t buf_size)
             break;
         }
 
-        if (is_escape == 0 && c == ESCS)
-        {
-            // escape sequence started
-            is_escape = 1;
-            continue;
-        }
-        if (is_escape && c == 0x5b)
-        {
-            is_csi = 1;
-            continue;
-        }
-        is_escape = 0;
-        if (is_csi && (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
-        {
-            continue;
-        }
-        is_csi = 0;
+        // if (is_escape == 0 && c == ESCS)
+        // {
+        //     // escape sequence started
+        //     is_escape = 1;
+        //     continue;
+        // }
+        // if (is_escape && c == 0x5b)
+        // {
+        //     is_csi = 1;
+        //     continue;
+        // }
+        // is_escape = 0;
+        // if (is_csi && (c == 'A' || c == 'B' || c == 'C' || c == 'D'))
+        // {
+        //     continue;
+        // }
+        // is_csi = 0;
 
         if ((c == '\b' || c == 0x7f) && position > 0)
         {
@@ -200,7 +200,7 @@ static int8_t shell_find_builtin(info_t *info)
 
 static void set_info(info_t *info)
 {
-    int8_t i = 0, j;
+    uint8_t i = 0, j;
 
     if (info->arg)
     {
@@ -227,8 +227,8 @@ static void set_info(info_t *info)
         if (info->argc > 1)
         {
             char **argv = malloc((1 + info->argc) * sizeof(char *));
-            int8_t k = 0;
-            for (i = 0; info->argv && info->argv[i]; i++)
+            uint8_t k = 0;
+            for (i = 0; info->argv && info->argv[i]; ++i)
                 if ('-' == info->argv[i][0])
                 {
                     for (j = 1; info->argv[i][j] != 0 && j < 6 /* total option count in enum */; j++)

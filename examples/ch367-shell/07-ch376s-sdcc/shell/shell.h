@@ -73,8 +73,9 @@ enum
     X(CMD_RAND, shell_rand, "rand", 0, 0, 0) \
     X(CMD_RESET, shell_reset, "reset", 0, 0, 0) \
     X(CMD_STATUS, shell_status, "status", 0, 0, 0) \
+    X(CMD_DATE, shell_date, "date", 0, 0, 0) \
     X(CMD_MOUNT, shell_mount, "mount", 0, 0, 0) \
-    X(CMD_UNMOUNT, shell_unmount, "unmount", 0, 0, 0) \
+    X(CMD_UNMOUNT, shell_unmount, "umount", 0, 0, 0) \
     X(CMD_DF, shell_df, "df", 0, 0, 0) \
     X(CMD_PWD, shell_pwd, "pwd", 0, 0, 0) \
     X(CMD_CD, shell_combined, "cd", 1, 1, 0) \
@@ -110,7 +111,7 @@ typedef struct builtin_params_s
     uint8_t argc_min;
     uint8_t argc_max;
     uint8_t flag_mask;
-} builtin_params_s;
+} builtin_params_t;
 
 void shell_loop(info_t *info);
 
@@ -140,6 +141,7 @@ int8_t shell_cd(info_t *info);
 //int8_t shell_rm(info_t *info);
 int8_t shell_run_basic(info_t *info);
 int8_t shell_combined(info_t *info);
+int8_t shell_date(info_t *info);
 
 char *shell_sanitize_path(const char *pwd, const char *path);
 char *_shell_normalize_file_name(const file_info_t *file_info, char * const buf, uint8_t length);
@@ -147,4 +149,4 @@ void _shell_file_info_print(const file_info_t *file_info, uint8_t flags);
 int8_t _shell_set_date(file_info_t *file_info, uint16_t year, uint16_t month, uint16_t day);
 void _shell_update_pwd(const file_info_t *file_info);
 
-extern const builtin_params_s builtin_params[];
+extern const builtin_params_t builtin_params[];

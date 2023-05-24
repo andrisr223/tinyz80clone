@@ -11,9 +11,9 @@
  */
 int8_t replace_vars(info_t *info)
 {
-    int8_t i = 0;
+    uint8_t i = 0;
 
-    for (i = 0; info->argv[i]; i++)
+    for (i = 0; info->argv[i]; ++i)
     {
         if (info->argv[i][0] != '$' || !info->argv[i][1])
             continue;
