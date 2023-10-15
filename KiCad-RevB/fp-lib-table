@@ -1,0 +1,7 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "libraries")(type "KiCad")(uri "${KIPRJMOD}/libraries")(options "")(descr ""))
+  (lib (name "footprints")(type "KiCad")(uri "${KIPRJMOD}/footprints")(options "")(descr ""))
+  (lib (name "onsemi")(type "KiCad")(uri "${KIPRJMOD}/footprints/ONSemi.pretty")(options "")(descr ""))
+  (lib (name "redip")(type "KiCad")(uri "${KIPRJMOD}/footprints/reDIP.pretty")(options "")(descr ""))
+)

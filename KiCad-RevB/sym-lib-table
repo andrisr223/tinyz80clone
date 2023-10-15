@@ -1,0 +1,13 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "slg46826")(type "Legacy")(uri "${KIPRJMOD}/libraries/SLG46826V.lib")(options "")(descr ""))
+  (lib (name "ch376")(type "KiCad")(uri "${KIPRJMOD}/libraries/CH376S.kicad_sym")(options "")(descr ""))
+  (lib (name "Tiny_Z80")(type "KiCad")(uri "${KIPRJMOD}/libraries/Tiny_Z80-rescue.kicad_sym")(options "")(descr ""))
+  (lib (name "AS6C4008")(type "KiCad")(uri "${KIPRJMOD}/libraries/AS6C4008.kicad_sym")(options "")(descr ""))
+  (lib (name "sram-flash")(type "KiCad")(uri "${KIPRJMOD}/libraries/sram-flash.kicad_sym")(options "")(descr ""))
+  (lib (name "gowin-lib")(type "KiCad")(uri "${KIPRJMOD}/libraries/gowin_fpga.kicad_sym")(options "")(descr ""))
+  (lib (name "tang-nano-9k")(type "KiCad")(uri "${KIPRJMOD}/libraries/tang-nano-9k.kicad_sym")(options "")(descr ""))
+  (lib (name "Nexperia")(type "KiCad")(uri "${KIPRJMOD}/libraries/Nexperia.kicad_sym")(options "")(descr ""))
+  (lib (name "Onsemi")(type "KiCad")(uri "${KIPRJMOD}/libraries/Onsemi.kicad_sym")(options "")(descr ""))
+  (lib (name "FC68133")(type "KiCad")(uri "${KIPRJMOD}/libraries/FC68133.kicad_sym")(options "")(descr ""))
+)

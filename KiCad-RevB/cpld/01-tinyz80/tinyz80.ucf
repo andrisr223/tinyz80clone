@@ -1,0 +1,81 @@
+# clock signals
+NET "CPU_CLK" LOC = "P15" ;
+NET "CPU_CLK" BUFG = CLK ;
+
+NET "UART_CLK" LOC = "P34" ;
+
+NET "CPU_CLK_3V_B" LOC = "P16" ;
+NET "CPU_CLK_3V_B" BUFG = CLK ;
+
+NET "CPU_CLK_3V" LOC = "P51" ;
+
+# chip selects
+NET "RNG_CSn" LOC = "P19" ;
+NET "RAM_CSn" LOC = "P20" ;
+NET "ROM_CSn" LOC = "P22" ;
+NET "I2C_CSn" LOC = "P35" ;
+NET "SPI_CSn" LOC = "P36" ;
+
+# LED_OUT
+# test pin, EX0 on debug connector
+NET "LED_OUT" LOC = "P40" ;
+# EX1 on debug connector
+NET "LED_OUT" LOC = "P42" ;
+
+# TN-
+NET "MODE" LOC = "P46" ;
+NET "CSR_CSn" LOC = "P47" ;
+NET "CSN_CSn" LOC = "P48" ;
+NET "GROM_CLK" LOC = "P52" ;
+# SID
+# SID chip has 32 registers but only 2 (4) pins are available
+# It will be necessary to write to aregister in two steps:
+# * select a register
+# * write a value to the selected register
+NET "CSS_CSn" LOC = "P50" ;
+
+# Z80 signals
+NET "WR" LOC = "P58" ;
+NET "RD" LOC = "P57" ;
+
+NET "M1" LOC = "P60" ;
+NET "MREQ" LOC = "P44" ;
+NET "IORQ" LOC = "P43" ;
+# TODO necessary?
+# NET "INT3V3" LOC = "P49" ;
+
+NET "RSTn" LOC = "P59" ;
+# NET "RESET_3V" LOC = "P56" ;
+
+# -- https://www.edaboard.com/threads/how-to-write-the-ucf-file-in-xilinx-for-array-variables.316709/
+NET D<0> LOC = "P8" ;
+NET D<1> LOC = "P9" ;
+NET D<2> LOC = "P10" ;
+NET D<3> LOC = "P11" ;
+NET D<4> LOC = "P12" ;
+NET D<5> LOC = "P13" ;
+NET D<6> LOC = "P18" ;
+NET D<7> LOC = "P17" ;
+
+NET "A<0>" LOC = "P62" ;
+NET "A<1>" LOC = "P61" ;
+NET "A<2>" LOC = "P63" ;
+NET "A<3>" LOC = "P64" ;
+NET "A<4>" LOC = "P1" ;
+NET "A<5>" LOC = "P2" ;
+NET "A<6>" LOC = "P4" ;
+NET "A<7>" LOC = "P5" ;
+
+NET "A_HI<14>" LOC = "P6" ;
+NET "A_HI<15>" LOC = "P7" ;
+
+NET "MA<14>" LOC = "P23" ;
+NET "MA<15>" LOC = "P24" ;
+NET "MA<16>" LOC = "P25" ;
+NET "MA<17>" LOC = "P27" ;
+NET "MA<18>" LOC = "P31" ;
+
+
+# SD card
+NET "SD_DETECT" LOC = "P32" ;
+
